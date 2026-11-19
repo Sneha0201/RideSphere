@@ -1,10 +1,15 @@
 from fastapi import FastAPI
+from database import engine, Base
+import models
 
 app = FastAPI(
     title="RideSphere",
     description="Smart Cab Booking Platform",
     version="1.0.0"
 )
+
+# Create Database tables
+Base.metadata.create_all(bind=engine)
 
 @app.get("/")
 def home():
@@ -13,15 +18,10 @@ def home():
         "status": "Backend is running successfully"
     }
 
-@app.get("/about")
-def about():
+@app.get("/database-status")
+def database_status():
     return {
-        "project": "RideSphere",
-        "technology": "Python FastAPI",
-        "features": [
-            "User Registration",
-            "Cab Booking",
-            "Driver Management",
-            "Fare Estimation"
-        ]
+        "database": "SQLite",
+        "status": "Connected",
+        "tables": ["users", "drivers", "rides"]
     }
