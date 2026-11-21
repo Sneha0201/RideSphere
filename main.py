@@ -45,6 +45,11 @@ class UserLogin(BaseModel):
     email: EmailStr
     password: str
 
+class DriverCreate(BaseModel):
+    name: str
+    vehicle_number: str
+    vehicle_type: str
+
 @app.post("/register")
 def register_user(
     user: UserCreate,
@@ -106,4 +111,83 @@ def login_user(
         "user_id": existing_user.id,
         "name": existing_user.name,
         "email": existing_user.email
+    }
+
+@app.post("/register_driver")
+def register_driver(
+    driver: DriverCreate,
+    db: Session = Depends(get_db)
+):
+    existing_driver = db.query(models.Driver).filter(models.Driver.vehicle_number == driver.vehicle_number).first()
+
+    if existing_driver:
+        raise HTTPException(
+            status_code=400,
+            detail="Vehicle already registered"
+        )
+
+    new_driver = models.Driver(
+        name=driver.name,
+        vehicle_number=driver.vehicle_number,
+        vehicle_type=driver.vehicle_type
+    )
+
+    db.add(new_driver)
+    db.commit()
+    db.refresh(new_driver)
+
+    return {
+        "message": "Driver registered successfully",
+        "driver_id": new_driver.id,
+        "name": new_driver.name,
+        "vehicle_number": new_driver.vehicle_number,
+        "vehicle_type": new_driver.vehicle_type
+    }
+
+@app.get("/drivers")
+def get_drivers(db: Session = Depends(get_db)):
+    drivers = db.query(models.Driver).all()
+
+    return {
+        "total_drivers": len(drivers),
+        "drivers": [
+            {
+                "id": d.id,
+                "name": d.name,
+                "vehicle_number": d.vehicle_number,
+                "vehicle_type": d.vehicle_type,
+                "available": d.available
+            }
+            for d in drivers
+        ]
+    }
+
+@app.put("/drivers/{driver_id}/availability")
+def update_driver_availability(
+    driver_id: int,
+    available: int,
+    db: Session = Depends(get_db)
+):
+    driver = db.query(models.Driver).filter(models.Driver.id == driver_id).first()
+
+    if not driver:
+        raise HTTPException(
+            status_code=404,
+            detail="Driver not found"
+        )
+
+    if available not in [0, 1]:
+        raise HTTPException(
+            status_code=400,
+            detail="Availability must be 0 or 1"
+        )
+
+    driver.available = available
+    db.commit()
+    db.refresh(driver)
+
+    return {
+        "message": "Driver availability updated",
+        "driver_id": driver.id,
+        "available": driver.available
     }
