@@ -245,3 +245,48 @@ def book_ride(ride: RideCreate, db: Session = Depends(get_db)):
         "fare": new_ride.fare,
         "status": new_ride.status
     }
+
+@app.get("/rides")
+def get_rides(db: Session = Depends(get_db)):
+    rides = db.query(models.Ride).all()
+
+    return {
+        "total_rides": len(rides),
+        "rides": [
+            {
+                "id": ride.id,
+                "user_id": ride.user_id,
+                "driver_id": ride.driver_id,
+                "pickup": ride.pickup,
+                "destination": ride.destination,
+                "fare": ride.fare,
+                "status": ride.status
+            }
+            for ride in rides
+        ]
+    }
+
+@app.put("/rides/{ride_id}/status")
+def update_ride_status(
+    ride_id: int,
+    status: str,
+    db: Session = Depends(get_db)
+):
+    ride = db.query(models.Ride).filter(models.Ride.id == ride_id).first()
+
+    if not ride:
+        raise HTTPException(
+            status_code=404,
+            detail="Ride not found"
+        )
+
+    ride.status = status
+
+    db.commit()
+    db.refresh(ride)
+
+    return {
+        "message": "Ride status updated successfully",
+        "ride_id": ride.id,
+        "status": ride.status
+    }
