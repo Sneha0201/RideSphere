@@ -330,3 +330,36 @@ def cancel_ride(
         "ride_id": ride.id,
         "status": ride.status
     }
+
+# Get rides for a specific user
+@app.get("/users/{user_id}/rides")
+def get_user_rides(
+    user_id: int,
+    db: Session = Depends(get_db)
+):
+    # Check whether user exists
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+
+    if not user:
+        raise HTTPException(
+            status_code=404,
+            detail="User not found"
+        )
+
+    # Fetch rides of the user
+    rides = db.query(models.Ride).filter(models.Ride.user_id == user_id).all()
+
+    return {
+        "user_id": user_id,
+        "total_rides": len(rides),
+        "rides": [
+            {
+                "id": ride.id,
+                "pickup": ride.pickup,
+                "destination": ride.destination,
+                "fare": ride.fare,
+                "status": ride.status
+            }
+            for ride in rides
+        ]
+    }
