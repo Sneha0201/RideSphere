@@ -50,6 +50,11 @@ class DriverCreate(BaseModel):
     vehicle_number: str
     vehicle_type: str
 
+class RideCreate(BaseModel):
+    user_id: int
+    pickup: str
+    destination: str
+
 @app.post("/register")
 def register_user(
     user: UserCreate,
@@ -190,4 +195,53 @@ def update_driver_availability(
         "message": "Driver availability updated",
         "driver_id": driver.id,
         "available": driver.available
+    }
+
+@app.post("/book_ride")
+def book_ride(ride: RideCreate, db: Session = Depends(get_db)):
+
+    # Check whether user exists
+    user = db.query(models.User).filter(models.User.id == ride.user_id).first()
+
+    if not user:
+        raise HTTPException(
+            status_code=404,
+            detail="User not found"
+        )
+
+    # Find an available driver
+    driver = db.query(models.Driver).filter(models.Driver.available == 1).first()
+
+    if not driver:
+        raise HTTPException(
+            status_code=404,
+            detail="No available drivers"
+        )
+
+    # Create new ride
+    new_ride = models.Ride(
+        user_id=ride.user_id,
+        driver_id=driver.id,
+        pickup=ride.pickup,
+        destination=ride.destination,
+        fare=0,
+        status="booked"
+    )
+
+    # Mark driver unavailable
+    driver.available = 0
+    
+    db.add(new_ride)
+    db.commit()
+    db.refresh(new_ride)
+
+    return {
+        "message": "Ride booked successfully",
+        "ride_id": new_ride.id,
+        "user_id": new_ride.user_id,
+        "driver_id": new_ride.driver_id,
+        "pickup": new_ride.pickup,
+        "destination": new_ride.destination,
+        "fare": new_ride.fare,
+        "status": new_ride.status
     }
