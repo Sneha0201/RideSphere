@@ -54,6 +54,7 @@ class RideCreate(BaseModel):
     user_id: int
     pickup: str
     destination: str
+    distance: float
 
 @app.post("/register")
 def register_user(
@@ -218,13 +219,18 @@ def book_ride(ride: RideCreate, db: Session = Depends(get_db)):
             detail="No available drivers"
         )
 
+    base_fare = 50
+    per_km_rate = 12
+
+    fare = base_fare + (ride.distance * per_km_rate)
+
     # Create new ride
     new_ride = models.Ride(
         user_id=ride.user_id,
         driver_id=driver.id,
         pickup=ride.pickup,
         destination=ride.destination,
-        fare=0,
+        fare=fare,
         status="booked"
     )
 
@@ -287,6 +293,40 @@ def update_ride_status(
 
     return {
         "message": "Ride status updated successfully",
+        "ride_id": ride.id,
+        "status": ride.status
+    }
+
+@app.put("/rides/{ride_id}/cancel")
+def cancel_ride(
+    ride_id: int,
+    db: Session = Depends(get_db)
+):
+    ride = db.query(models.Ride).filter(models.Ride.id == ride_id).first()
+
+    if not ride:
+        raise HTTPException(
+            status_code=404,
+            detail="Ride not found"
+        )
+
+    if ride.status != "booked":
+        raise HTTPException(
+            status_code=404,
+            detail="Only booked rides can be cancelled"
+        )
+    
+    # Make driver available again
+    driver = db.query(models.Driver).filter(models.Driver.id == ride.driver_id).first()
+    if driver:
+        driver.available = 1
+    
+    ride.status = "cancelled"
+    db.commit()
+    db.refresh(ride)
+
+    return {
+        "message": "Ride cancelled successfully",
         "ride_id": ride.id,
         "status": ride.status
     }
