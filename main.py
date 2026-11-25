@@ -286,6 +286,13 @@ def update_ride_status(
             detail="Ride not found"
         )
 
+    # Make driver available after ride completion or cancellation
+    if status in ["completed", "cancelled"]:
+        driver = db.query(models.Driver).filter(models.Driver.id == ride.driver_id).first()
+
+        if driver:
+            driver.available = 1
+    
     ride.status = status
 
     db.commit()
@@ -355,6 +362,38 @@ def get_user_rides(
         "rides": [
             {
                 "id": ride.id,
+                "pickup": ride.pickup,
+                "destination": ride.destination,
+                "fare": ride.fare,
+                "status": ride.status
+            }
+            for ride in rides
+        ]
+    }
+
+# Get rides for a specific driver
+@app.get("/drivers/{driver_id}/rides")
+def get_driver_rides(
+    driver_id: int,
+    db: Session = Depends(get_db)
+):
+    driver = db.query(models.Driver).filter(models.Driver.id == driver_id).first()
+
+    if not driver:
+        raise HTTPException(
+            status_code=404,
+            detail="Driver not found"
+        )
+
+    rides = db.query(models.Ride).filter(models.Ride.driver_id == driver_id).all()
+
+    return {
+        "driver_id": driver_id,
+        "total_rides": len(rides),
+        "rides": [
+            {
+                "id": ride.id,
+                "user_id": ride.user_id,
                 "pickup": ride.pickup,
                 "destination": ride.destination,
                 "fare": ride.fare,
